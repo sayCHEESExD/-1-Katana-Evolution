@@ -23,6 +23,7 @@
     "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
     "start": "npm run start --workspace @katana/server",
     "verify:assets": "node scripts/verify-assets.mjs",
+    "verify:docker": "node scripts/verify-docker-context.mjs",
     "size:client": "node scripts/build-size.mjs",
     "verify:progression": "npm run build:server && node scripts/verify-progression.mjs",
     "verify": "npm run verify:progression && npm run verify:assets",

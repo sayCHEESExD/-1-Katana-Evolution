@@ -15,6 +15,7 @@ npm run verify:capacity     # needs a running server on :2587; expects 15-per-ro
 npm run verify:multiplayer  # needs a running server; the full stage run (attack, death, clear, continue, claim, reset), privacy, forgeries
 npm run verify:persistence  # identity/storage/migration/purchases, JSON and Mongo (if mongod is found)
 npm run size:client         # client/dist size against the 12 MB budget
+npm run verify:docker       # applies .dockerignore and proves every Dockerfile COPY source is in the context
 ```
 
 Do NOT use python from the Bash tool on this machine (Windows Store stub stalls). Use node/sed/perl.
@@ -81,6 +82,16 @@ Never commit or push: the user handles git.
 - Rare-katana aura (`client/src/katana/KatanaFx.ts`): additive sprites in the shop halo colour, by band -
   1-2 none, 3-5 glow, 6-8 breathing glow, 9-11 + spiral sparks, 12-14 + tip flare and more sparks.
 - Boards: Most Wins (`lifetimeWins`), Most Damage, Most Time (`playSeconds`, `formatPlayTime`).
+
+## Deploy (Bloxity Hosting)
+
+`.github/workflows/deploy.yml`: `dev` -> DEV, `main` -> PROD, nothing else. Server -> GHCR image
+`ghcr.io/<owner>/katana-evolution-server:<channel>-<sha>`, rolled with `POST legion.bloxity.io/v1/apps/katana-evolution/deploy`
+(channel, image, version = commit sha, seatCap 15, maxReplicas 5). Client -> Vite build with `VITE_SERVER_URL`
+baked in, zipped with `index.html` AT THE ROOT, uploaded raw (`Content-Type: application/zip`) to
+`POST api.bloxity.io/v1/hosting/games/katana-evolution/frontend?channel=<channel>&version=<sha>`. Both routes are
+the documented ones and were checked live (401/400, not 404). The only secret is `LEGION_DEPLOY_TOKEN`; no
+repository variables. `PORT` and `/health` are the host's contract - do not change them.
 
 ## Progress and identity
 
