@@ -98,10 +98,44 @@ jobs:
       # GHCR references must be entirely lower case, and a GitHub account name
       # need not be. Lowercasing the owner here keeps the image name valid
       # without hardcoding anybody's login into the file.
+      # WHOSE GHCR NAMESPACE THE IMAGE GOES TO.
+      #
+      # Legion pulls the image ANONYMOUSLY and supports no registry
+      # credentials, so the package has to be public. An organisation can
+      # forbid its members from publishing public packages ("Setting is
+      # disabled by organization administrators"), which leaves the image
+      # unpullable and every pod unable to start.
+      #
+      # So: with GHCR_PUSH_TOKEN set, the image is pushed to THAT token's
+      # own account, where the package can be made public without an org
+      # owner. Without it nothing changes - the built-in GITHUB_TOKEN pushes
+      # to the repository owner's namespace, as before. The REPOSITORY stays
+      # private either way: a package's visibility is independent of it.
+      #
+      # The account name is read back from the token rather than written
+      # here, so the namespace cannot drift from whoever the token belongs to.
       - name: Resolve the image name
         id: image
+        env:
+          PUSH_TOKEN: ${{ secrets.GHCR_PUSH_TOKEN }}
         run: |
-          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          set -euo pipefail
+          if [ -n "${PUSH_TOKEN:-}" ]; then
+            LOGIN=$(curl -sS -H "Authorization: Bearer ${PUSH_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              https://api.github.com/user | jq -r '.login // empty')
+            if [ -z "$LOGIN" ]; then
+              echo "::error::GHCR_PUSH_TOKEN is set but GitHub did not accept it. It must be a classic PAT with the write:packages scope."
+              exit 1
+            fi
+            echo "Pushing to ${LOGIN}'s own namespace (GHCR_PUSH_TOKEN)."
+          else
+            LOGIN="${{ github.actor }}"
+            echo "Pushing to the repository owner's namespace (GITHUB_TOKEN)."
+          fi
+          OWNER=$(echo "$LOGIN" | tr '[:upper:]' '[:lower:]')
+          echo "user=$LOGIN" >> "$GITHUB_OUTPUT"
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
           echo "name=ghcr.io/${OWNER}/${BLOXITY_GAME_ID}-server" >> "$GITHUB_OUTPUT"
 
       # The image is only as good as what reaches the builder: this applies the
@@ -116,8 +150,9 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ steps.image.outputs.user }}
+          # The personal push token when there is one, else the run's own token.
+          password: ${{ secrets.GHCR_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Build and push the server image
         uses: docker/build-push-action@v6
@@ -193,6 +228,66 @@ jobs:
           else
             echo "Backend: https://${BLOXITY_GAME_ID}.host.bloxity.io"
           fi
+
+      # A pushed image Legion cannot PULL looks like a successful deploy here and
+      # a dead game to players: GHCR packages are PRIVATE by default. This asks
+      # ghcr.io for an anonymous pull token - exactly what Legion needs - and
+      # says how to fix it rather than failing a deploy that may be fine.
+      - name: Check the image can be pulled anonymously
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+        run: |
+          set -uo pipefail
+          REPO="${IMAGE_NAME#ghcr.io/}"
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:${REPO}:pull" || echo 000)
+          if [ "$CODE" = "200" ]; then
+            echo "Public: Legion can pull ${IMAGE_NAME}."
+          else
+            echo "::warning::ghcr.io/${REPO} is not anonymously pullable (HTTP $CODE). Legion cannot start the pod while the package is private. Fix: GitHub -> your profile/org -> Packages -> ${BLOXITY_GAME_ID}-server -> Package settings -> Change visibility -> Public."
+            {
+              echo "### Image visibility"
+              echo "\`ghcr.io/${REPO}\` is **not** anonymously pullable (HTTP $CODE)."
+              echo "Legion pulls anonymously, so make the package **public** or the backend cannot start."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # A 2xx from Legion means ACCEPTED, not RUNNING: an image it cannot pull,
+      # or a container that exits on boot, both leave the edge answering 503
+      # (`game backend unreachable`). Poll the channel's own /health - the same
+      # probe the container's HEALTHCHECK uses - so a dead backend shows up in
+      # this run instead of in the game. A warning, not a failure: a backend
+      # that has scaled to zero answers 503 too, and that is not a broken deploy.
+      - name: Wait for the backend to answer /health
+        env:
+          CHANNEL: ${{ needs.channel.outputs.name }}
+        run: |
+          set -uo pipefail
+          if [ "$CHANNEL" = "dev" ]; then
+            HOST="${BLOXITY_GAME_ID}.dev.host.bloxity.io"
+          else
+            HOST="${BLOXITY_GAME_ID}.host.bloxity.io"
+          fi
+          echo "Polling https://${HOST}/health for up to 3 minutes."
+          for attempt in $(seq 1 18); do
+            CODE=$(curl -sS -o /tmp/health.out -w '%{http_code}' --max-time 10 "https://${HOST}/health" || echo 000)
+            if [ "$CODE" = "200" ]; then
+              echo "Backend is live: $(cat /tmp/health.out)"
+              echo "- Backend **live**: \`wss://${HOST}\`" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "  attempt ${attempt}/18: HTTP $CODE $(head -c 120 /tmp/health.out 2>/dev/null)"
+            sleep 10
+          done
+          echo "::warning::${HOST} never answered /health. The image was pushed and Legion accepted the deploy, so the pod is not running."
+          {
+            echo "### Backend did not come up"
+            echo "\`https://${HOST}/health\` did not answer 200 within 3 minutes. In order of likelihood:"
+            echo "1. The GHCR package is **private** - Legion cannot pull it (see the step above)."
+            echo "2. The container exits on boot - check the Bloxity dashboard logs for this channel."
+            echo "3. The backend has scaled to zero and simply was not woken by this probe (harmless)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
   # ------------------------------------------------------------------ client
   client:

@@ -71,4 +71,26 @@ One-time setup:
 3. After the first run, make the GHCR package `katana-evolution-server` public (repository, Packages,
    Package settings, Change visibility) so Legion can pull it.
 
+   If that says *"Setting is disabled by organization administrators"*, the organisation forbids public
+   packages. Set the optional secret `GHCR_PUSH_TOKEN` instead - a classic PAT with the `write:packages`
+   scope on a PERSONAL account - and the image is pushed to that account's namespace
+   (`ghcr.io/<that-account>/katana-evolution-server`), where it can be made public without an org owner:
+   GitHub -> your profile -> Packages -> Package settings -> Change visibility -> Public. The repository
+   stays where it is and stays private; a package's visibility is independent of it. With no such secret the
+   workflow behaves exactly as before.
+
+If the game loads but says **"Not connected to the game server"**, the FRONTEND is fine and the backend is
+not running. Check it directly:
+
+```bash
+curl https://katana-evolution.dev.host.bloxity.io/health
+```
+
+- `503 game backend unreachable` - the pod is not up. In order of likelihood: the GHCR package is still
+  **private** (Legion pulls anonymously, so it cannot start the image), the `server` job of the workflow
+  failed, or the container exits on boot (the channel logs on the Bloxity dashboard say which). The
+  workflow reports the first two itself - see "Check the image can be pulled anonymously" and "Wait for the
+  backend to answer /health" in the run.
+- `200` - the backend is live, and the problem is the `VITE_SERVER_URL` baked into the client.
+
 Progress lives in the Legion-injected MongoDB, per channel, so deploys never reset players.
