@@ -279,14 +279,25 @@ jobs:
             echo "  attempt ${attempt}/18: HTTP $CODE $(head -c 120 /tmp/health.out 2>/dev/null)"
             sleep 10
           done
-          echo "::warning::${HOST} never answered /health. The image was pushed and Legion accepted the deploy, so the pod is not running."
           {
             echo "### Backend did not come up"
-            echo "\`https://${HOST}/health\` did not answer 200 within 3 minutes. In order of likelihood:"
-            echo "1. The GHCR package is **private** - Legion cannot pull it (see the step above)."
-            echo "2. The container exits on boot - check the Bloxity dashboard logs for this channel."
-            echo "3. The backend has scaled to zero and simply was not woken by this probe (harmless)."
+            echo "\`https://${HOST}/health\` did not answer 200 within 3 minutes, though the image was pushed"
+            echo "and Legion accepted the deploy. Check, in order:"
+            echo "1. The **response body** printed by the \"Roll the server on Legion\" step above - Legion may have"
+            echo "   accepted the request and then failed to start the pod."
+            echo "2. The channel's logs on the Bloxity dashboard: a container that exits on boot looks like this."
+            echo "3. Whether the image tag it was asked for exists in the registry (the push step above names it)."
           } >> "$GITHUB_STEP_SUMMARY"
+          # On PROD this is an OUTAGE, and a silent one is how it went unnoticed
+          # before: players get "not connected" while the run sits green. On DEV
+          # it is only a warning, so a half-finished experiment does not block.
+          # (A deployed backend answers /health even with nobody on it - an idle
+          # pod is not the reason this probe fails.)
+          if [ "$CHANNEL" = "prod" ]; then
+            echo "::error::${HOST} never answered /health: PROD players cannot connect. See the job summary."
+            exit 1
+          fi
+          echo "::warning::${HOST} never answered /health. The pod is not running - see the job summary."
 
 
   # ------------------------------------------------------------------ client
