@@ -104,6 +104,12 @@ jobs:
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "name=ghcr.io/${OWNER}/${BLOXITY_GAME_ID}-server" >> "$GITHUB_OUTPUT"
 
+      # The image is only as good as what reaches the builder: this applies the
+      # .dockerignore rules and fails if a file the Dockerfile copies - a
+      # workspace manifest above all - would be excluded from the context.
+      - name: Check the Docker build context
+        run: node scripts/verify-docker-context.mjs
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
@@ -243,6 +249,9 @@ jobs:
           (cd client/dist && zip -qr "${GITHUB_WORKSPACE}/client-dist.zip" .)
           ls -la client-dist.zip
           unzip -l client-dist.zip | head -20
+          # index.html must be AT THE ROOT of the archive: Bloxity serves the
+          # zip as the site, and one nested directory would serve a blank page.
+          unzip -l client-dist.zip | grep -qE " index[.]html$" || { echo "::error::index.html is not at the root of client-dist.zip."; exit 1; }
 
       - name: Keep the bundle on the run
         uses: actions/upload-artifact@v4

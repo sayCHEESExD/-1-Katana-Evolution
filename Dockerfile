@@ -5,8 +5,8 @@
 # a build context of `server/` alone has no `shared/` to resolve it against and
 # no root lockfile to install from.
 #
-#   docker build -t tongue-server .
-#   docker run -e PORT=2587 -p 2587:2587 tongue-server
+#   docker build -t katana-server .
+#   docker run -e PORT=2587 -p 2587:2587 katana-server
 
 # ---------------------------------------------------------------- build ----
 FROM node:20-alpine AS build
