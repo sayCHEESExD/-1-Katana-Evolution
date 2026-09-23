@@ -104,15 +104,34 @@ export const injectHudStyles = (): void => {
 }
 
 /* ---- Left rail ---------------------------------------------------------- */
-.aoe-rail {
+/*
+ * THE LEFT DOCK: the progression indicators and the button rail, as ONE
+ * vertical group anchored to the left edge and centred on it. The indicators
+ * sit directly above the first tile with one fixed gap between them, and
+ * every measure is in --u, so the whole group scales with the viewport
+ * instead of growing past it on a phone or a short window.
+ *
+ * The dock itself takes no pointer events - its box spans the widest child,
+ * and the gaps between tiles are not click targets - so only the tiles do.
+ */
+.aoe-dock {
   position: fixed;
   left: max(10px, calc(16 * var(--u)), env(safe-area-inset-left, 0px));
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: calc(22 * var(--u));
+  align-items: flex-start;
+  gap: calc(18 * var(--u));
   z-index: 21;
+  pointer-events: none;
+  user-select: none;
+}
+.aoe-rail {
+  display: flex;
+  flex-direction: column;
+  gap: calc(22 * var(--u));
+  pointer-events: auto;
   user-select: none;
 }
 /* A RAIL TILE: a rounded gradient plate with a dark rim and a drop. */

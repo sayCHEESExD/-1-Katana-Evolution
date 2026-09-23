@@ -113,6 +113,7 @@ export class Game {
   private readonly xpPopups: XpPopups;
   private readonly trophyBurst: TrophyBurst;
   private readonly fpsReadout: HTMLDivElement;
+  private readonly dock: HTMLDivElement;
   private readonly rail: HTMLDivElement;
   private readonly rebirthButton: RailButton;
   private readonly petsButton: RailButton;
@@ -159,7 +160,11 @@ export class Game {
     this.remotePlayers = new RemotePlayerManager(this.sceneManager.scene);
     this.stats = new StatsHud(container, () => this.toggleAuto());
     this.target = new TargetBar(container);
-    this.counters = new Counters(container);
+    // The indicators and the rail below them are one left-anchored group.
+    this.dock = document.createElement('div');
+    this.dock.className = 'aoe-dock';
+    container.appendChild(this.dock);
+    this.counters = new Counters(this.dock);
     this.hint = new HintLine(container);
     this.toasts = new Toasts(container);
     this.popup = new LevelUpPopup(container);
@@ -170,7 +175,7 @@ export class Game {
 
     this.rail = document.createElement('div');
     this.rail.className = 'aoe-rail';
-    container.appendChild(this.rail);
+    this.dock.appendChild(this.rail);
 
     this.rebirthPanel = new RebirthPanel(container, () => this.network.requestRebirth());
     this.teleportPanel = new TeleportPanel(container, (to) => this.network.teleport(to));

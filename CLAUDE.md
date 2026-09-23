@@ -38,7 +38,9 @@ Never commit or push: the user handles git.
   replicated `lifetimeXp`, so it can never award or invent XP; rapid gains merge, at most 4 on screen.
 - Client prediction replays `stepPlayer` and reconciles. Test harnesses must feed input at real-time pace.
 - No health bars above enemies: the top-centre target bar shows name + health.
-- **Responsive HUD: one unit** `--u` (`client/src/ui/hudStyles.ts`); left rail anchored left + vertical centre.
+- **Responsive HUD: one unit** `--u` (`client/src/ui/hudStyles.ts`). The Wins/rebirth indicators and the button
+  rail are ONE group, `.aoe-dock`: left edge, vertically centred, indicators above the tiles. The dock takes no
+  pointer events; `.aoe-rail` re-enables them, so only the tiles are click targets.
 - **No overlapping solids.** Every solid lives in `shared/src/config/map.ts` (`buildStaticSolids`) and
   `decor.ts` (`decorSolids`); the client draws to match.
 

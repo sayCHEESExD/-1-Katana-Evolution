@@ -194,16 +194,15 @@ export const injectKatanaStyles = (): void => {
 .ke-target__hp { position: absolute; inset: 0; display: grid; place-items: center; font-size: max(12px, calc(22 * var(--u))); }
 .ke-target__lock { margin-top: calc(6 * var(--u)); font-size: max(12px, calc(22 * var(--u))); color: #d9a6ff; }
 
-/* ---- Top left: Wins and rebirths ---------------------------------------- */
+/* ---- Wins and rebirths: the top row of the left dock, above the rail ----- */
 .ke-counters {
-  position: fixed;
-  left: max(10px, calc(16 * var(--u)), env(safe-area-inset-left, 0px));
-  top: calc(max(10px, calc(20 * var(--u))) + var(--aoe-portal-top, 0px));
-  z-index: 21;
   display: flex;
-  /* In a row, not a stack: the rail is centred on the left edge and a short screen leaves little room above it. */
+  /* In a row, not a stack: a stack would push the tiles off a short screen. */
   flex-direction: row;
+  align-items: center;
   gap: calc(14 * var(--u));
+  /* The chip's padding already insets its icon; this lines the icons up with the tiles below. */
+  margin-left: calc(-6 * var(--u));
   pointer-events: none;
   font-family: var(--gs-font);
   font-weight: 700;
