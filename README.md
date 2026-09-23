@@ -68,16 +68,9 @@ One-time setup:
 
 1. Create the game `katana-evolution` on https://hosting.bloxity.io (My Games).
 2. Add the repository secret `LEGION_DEPLOY_TOKEN` (the token from My Games, behind the eye icon).
-3. After the first run, make the GHCR package `katana-evolution-server` public (repository, Packages,
-   Package settings, Change visibility) so Legion can pull it.
-
-   If that says *"Setting is disabled by organization administrators"*, the organisation forbids public
-   packages. Set the optional secret `GHCR_PUSH_TOKEN` instead - a classic PAT with the `write:packages`
-   scope on a PERSONAL account - and the image is pushed to that account's namespace
-   (`ghcr.io/<that-account>/katana-evolution-server`), where it can be made public without an org owner:
-   GitHub -> your profile -> Packages -> Package settings -> Change visibility -> Public. The repository
-   stays where it is and stays private; a package's visibility is independent of it. With no such secret the
-   workflow behaves exactly as before.
+3. After the first run, make the GHCR package `katana-evolution-server` public so Legion can pull it:
+   GitHub -> your profile -> Packages -> `katana-evolution-server` -> Package settings -> Change
+   visibility -> Public. The repository itself can stay private; a package visibility is independent of it.
 
 If the game loads but says **"Not connected to the game server"**, the FRONTEND is fine and the backend is
 not running. Check it directly:
