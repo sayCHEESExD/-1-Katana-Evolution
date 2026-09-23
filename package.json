@@ -1,0 +1,40 @@
+{
+  "name": "katana-evolution",
+  "version": "0.1.0",
+  "private": true,
+  "description": "+1 Katana Evolution - browser multiplayer samurai progression game (Three.js + Colyseus)",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace @katana/shared",
+    "dev": "npm run build:shared && concurrently -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @katana/server",
+    "dev:client": "npm run dev --workspace @katana/client",
+    "build": "npm run build:shared && npm run build --workspace @katana/server && npm run build --workspace @katana/client",
+    "build:client": "npm run build:shared && npm run build --workspace @katana/client",
+    "build:server": "npm run build:shared && npm run build --workspace @katana/server",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "start": "npm run start --workspace @katana/server",
+    "verify:assets": "node scripts/verify-assets.mjs",
+    "size:client": "node scripts/build-size.mjs",
+    "verify:progression": "npm run build:server && node scripts/verify-progression.mjs",
+    "verify": "npm run verify:progression && npm run verify:assets",
+    "verify:capacity": "node scripts/verify-capacity.mjs",
+    "verify:persistence": "npm run build:server && node scripts/verify-persistence.mjs",
+    "verify:multiplayer": "node scripts/verify-multiplayer.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@colyseus/core": "0.16.24"
+  }
+}
