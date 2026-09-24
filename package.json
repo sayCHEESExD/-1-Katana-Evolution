@@ -29,7 +29,8 @@
     "verify": "npm run verify:progression && npm run verify:assets",
     "verify:capacity": "node scripts/verify-capacity.mjs",
     "verify:persistence": "npm run build:server && node scripts/verify-persistence.mjs",
-    "verify:multiplayer": "node scripts/verify-multiplayer.mjs"
+    "verify:multiplayer": "node scripts/verify-multiplayer.mjs",
+    "verify:large-room": "node scripts/verify-large-room.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

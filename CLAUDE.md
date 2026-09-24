@@ -13,6 +13,7 @@ npm run typecheck           # all workspaces
 npm run verify              # verify:progression + verify:assets
 npm run verify:capacity     # needs a running server on :2587; expects 15-per-room routing
 npm run verify:multiplayer  # needs a running server; the full stage run (attack, death, clear, continue, claim, reset), privacy, forgeries
+npm run verify:large-room   # needs a running server; a latency-delayed joiner in a 14-player room (state > 8 KB) gets its own player, 59 enemies, XP
 npm run verify:persistence  # identity/storage/migration/purchases, JSON and Mongo (if mongod is found)
 npm run size:client         # client/dist size against the 12 MB budget
 npm run verify:docker       # applies .dockerignore and proves every Dockerfile COPY source is in the context
@@ -45,6 +46,9 @@ Never commit or push: the user handles git.
 - **Responsive HUD: one unit** `--u` (`client/src/ui/hudStyles.ts`). The Wins/rebirth indicators and the button
   rail are ONE group, `.aoe-dock`: left edge, vertically centred, indicators above the tiles. The dock takes no
   pointer events; `.aoe-rail` re-enables them, so only the tiles are click targets.
+- **State encoder buffer = 128 KB** (`server/src/config/stateEncoding.ts`, imported FIRST by `index.ts`). @colyseus/schema
+  3.0.x truncates a StateView client's full state at `Encoder.BUFFER_SIZE` (default 8 KB) - a player joining a busy
+  room lost its own player/enemies. Never lower it; `verify:large-room` guards it.
 - **No overlapping solids.** Every solid lives in `shared/src/config/map.ts` (`buildStaticSolids`) and
   `decor.ts` (`decorSolids`); the client draws to match.
 
@@ -108,5 +112,5 @@ webhook-recorded Bux grants (`wins_small`, `wins_large`).
 ## Verification before calling anything done
 
 `npm run typecheck && npm run verify && npm run build:client && npm run size:client`, then
-`npm run verify:capacity` and `npm run verify:multiplayer` against a running dev server, and
+`npm run verify:capacity`, `npm run verify:multiplayer` and `npm run verify:large-room` against a running dev server, and
 `npm run verify:persistence` after any change to auth, persistence, join/leave/switch paths or the webhook.

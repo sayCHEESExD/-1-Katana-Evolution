@@ -1,3 +1,5 @@
+// FIRST: size the state encoder before any room exists (see config/stateEncoding.ts).
+import './config/stateEncoding.js';
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { ROOM_NAME } from '@katana/shared';
