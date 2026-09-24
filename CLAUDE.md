@@ -23,7 +23,11 @@ Never commit or push: the user handles git.
 
 ## Non-negotiable rules
 
-- Ports: server **2587**, Vite **5187**, preview 4187. Room `katanaevolution`, Bloxity slug `katana-evolution`, 15 per room.
+- Ports: server **2587**, Vite **5187**, preview 4187. Room `katanaevolution`, 15 per room.
+- **Bloxity game id `katana-evolve`**, set ONCE in `deploy.yml` (`BLOXITY_GAME_ID`). It reaches the client as
+  `VITE_BLOXITY_GAME_ID` at build time and the server as the `BLOXITY_GAME_ID` Legion injects into the pod. The
+  code fallbacks (`shared/src/config/accounts.ts`, `client/src/bloxity/Bloxity.ts`) still say `katana-evolution`
+  and only apply when neither is set, i.e. local dev.
 - **Client build must stay under 12 MB** (currently ~4.0 MB, 2.4 MB of it the music). World textures are canvas-drawn
   (`client/src/world/WorldTextures.ts`). Only `assets/` ships as files; `scripts/verify-assets.mjs` pins their digests.
 - **Server-authoritative everything.** Clients send inputs and requests (move, attack hint, pad, buy, hatch,
@@ -88,10 +92,10 @@ Never commit or push: the user handles git.
 ## Deploy (Bloxity Hosting)
 
 `.github/workflows/deploy.yml`: `dev` -> DEV, `main` -> PROD, nothing else. Server -> GHCR image
-`ghcr.io/<owner>/katana-evolution-server:<channel>-<sha>`, rolled with `POST legion.bloxity.io/v1/apps/katana-evolution/deploy`
+`ghcr.io/<owner>/katana-evolve-server:<channel>-<sha>`, rolled with `POST legion.bloxity.io/v1/apps/katana-evolve/deploy`
 (channel, image, version = commit sha, seatCap 15, maxReplicas 5). Client -> Vite build with `VITE_SERVER_URL`
 baked in, zipped with `index.html` AT THE ROOT, uploaded raw (`Content-Type: application/zip`) to
-`POST api.bloxity.io/v1/hosting/games/katana-evolution/frontend?channel=<channel>&version=<sha>`. Both routes are
+`POST api.bloxity.io/v1/hosting/games/katana-evolve/frontend?channel=<channel>&version=<sha>`. Both routes are
 the documented ones and were checked live (401/400, not 404). The only secret is `LEGION_DEPLOY_TOKEN`; no
 repository variables. `PORT` and `/health` are the host's contract - do not change them.
 

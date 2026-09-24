@@ -44,7 +44,7 @@ env:
   # THE GAME ID REGISTERED ON BLOXITY. Every route, every hostname and the
   # image name are built from this one string, so a game renamed on Bloxity is
   # a one-line change here.
-  BLOXITY_GAME_ID: katana-evolution
+  BLOXITY_GAME_ID: katana-evolve
 
   # The room's player cap, and the same number as MAX_PLAYERS_PER_ROOM. Legion
   # fills a pod to seatCap and then spawns the next one, so this MUST equal the
@@ -100,7 +100,7 @@ jobs:
       # without hardcoding anybody's login into the file: the image goes to
       # the namespace of whoever owns this repository, pushed by the run's own
       # GITHUB_TOKEN. With the repository on a personal account that is
-      # ghcr.io/<account>/katana-evolution-server.
+      # ghcr.io/<account>/katana-evolve-server.
       - name: Resolve the image name
         id: image
         run: |
@@ -316,8 +316,8 @@ jobs:
           # because the page is served over https and a browser will not open
           # an insecure socket from a secure page. These are the documented
           # Bloxity backend hostnames for this game id:
-          #   dev  -> wss://katana-evolution.dev.host.bloxity.io
-          #   prod -> wss://katana-evolution.host.bloxity.io
+          #   dev  -> wss://katana-evolve.dev.host.bloxity.io
+          #   prod -> wss://katana-evolve.host.bloxity.io
           VITE_SERVER_URL: ${{ needs.channel.outputs.name == 'prod' && format('wss://{0}.host.bloxity.io', env.BLOXITY_GAME_ID) || format('wss://{0}.dev.host.bloxity.io', env.BLOXITY_GAME_ID) }}
         run: |
           set -euo pipefail
