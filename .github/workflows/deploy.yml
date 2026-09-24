@@ -44,7 +44,7 @@ env:
   # THE GAME ID REGISTERED ON BLOXITY. Every route, every hostname and the
   # image name are built from this one string, so a game renamed on Bloxity is
   # a one-line change here.
-  BLOXITY_GAME_ID: katana-evolution
+  BLOXITY_GAME_ID: katana-evolve
 
   # The room's player cap, and the same number as MAX_PLAYERS_PER_ROOM. Legion
   # fills a pod to seatCap and then spawns the next one, so this MUST equal the
@@ -97,45 +97,15 @@ jobs:
 
       # GHCR references must be entirely lower case, and a GitHub account name
       # need not be. Lowercasing the owner here keeps the image name valid
-      # without hardcoding anybody's login into the file.
-      # WHOSE GHCR NAMESPACE THE IMAGE GOES TO.
-      #
-      # Legion pulls the image ANONYMOUSLY and supports no registry
-      # credentials, so the package has to be public. An organisation can
-      # forbid its members from publishing public packages ("Setting is
-      # disabled by organization administrators"), which leaves the image
-      # unpullable and every pod unable to start.
-      #
-      # So: with GHCR_PUSH_TOKEN set, the image is pushed to THAT token's
-      # own account, where the package can be made public without an org
-      # owner. Without it nothing changes - the built-in GITHUB_TOKEN pushes
-      # to the repository owner's namespace, as before. The REPOSITORY stays
-      # private either way: a package's visibility is independent of it.
-      #
-      # The account name is read back from the token rather than written
-      # here, so the namespace cannot drift from whoever the token belongs to.
+      # without hardcoding anybody's login into the file: the image goes to
+      # the namespace of whoever owns this repository, pushed by the run's own
+      # GITHUB_TOKEN. With the repository on a personal account that is
+      # ghcr.io/<account>/katana-evolve-server.
       - name: Resolve the image name
         id: image
-        env:
-          PUSH_TOKEN: ${{ secrets.GHCR_PUSH_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -n "${PUSH_TOKEN:-}" ]; then
-            LOGIN=$(curl -sS -H "Authorization: Bearer ${PUSH_TOKEN}" \
-              -H 'Accept: application/vnd.github+json' \
-              https://api.github.com/user | jq -r '.login // empty')
-            if [ -z "$LOGIN" ]; then
-              echo "::error::GHCR_PUSH_TOKEN is set but GitHub did not accept it. It must be a classic PAT with the write:packages scope."
-              exit 1
-            fi
-            echo "Pushing to ${LOGIN}'s own namespace (GHCR_PUSH_TOKEN)."
-          else
-            LOGIN="${{ github.actor }}"
-            echo "Pushing to the repository owner's namespace (GITHUB_TOKEN)."
-          fi
-          OWNER=$(echo "$LOGIN" | tr '[:upper:]' '[:lower:]')
-          echo "user=$LOGIN" >> "$GITHUB_OUTPUT"
-          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "name=ghcr.io/${OWNER}/${BLOXITY_GAME_ID}-server" >> "$GITHUB_OUTPUT"
 
       # The image is only as good as what reaches the builder: this applies the
@@ -150,9 +120,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ steps.image.outputs.user }}
-          # The personal push token when there is one, else the run's own token.
-          password: ${{ secrets.GHCR_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the server image
         uses: docker/build-push-action@v6
@@ -211,6 +180,14 @@ jobs:
           echo "--- response ($HTTP) ---"
           cat /tmp/deploy.out || true
           echo
+
+          {
+            echo "LEGION_STATUS=$HTTP"
+            echo "LEGION_BODY<<LEGION_EOF"
+            head -c 800 /tmp/deploy.out 2>/dev/null || true
+            echo
+            echo "LEGION_EOF"
+          } >> "$GITHUB_ENV"
 
           case "$HTTP" in
             2*) echo "Server rolled on '$CHANNEL' with seatCap ${SEAT_CAP}, maxReplicas ${MAX_REPLICAS}." ;;
@@ -279,14 +256,31 @@ jobs:
             echo "  attempt ${attempt}/18: HTTP $CODE $(head -c 120 /tmp/health.out 2>/dev/null)"
             sleep 10
           done
-          echo "::warning::${HOST} never answered /health. The image was pushed and Legion accepted the deploy, so the pod is not running."
           {
             echo "### Backend did not come up"
-            echo "\`https://${HOST}/health\` did not answer 200 within 3 minutes. In order of likelihood:"
-            echo "1. The GHCR package is **private** - Legion cannot pull it (see the step above)."
-            echo "2. The container exits on boot - check the Bloxity dashboard logs for this channel."
-            echo "3. The backend has scaled to zero and simply was not woken by this probe (harmless)."
+            echo "\`https://${HOST}/health\` did not answer 200 within 3 minutes, though the image was pushed"
+            echo "and Legion accepted the deploy. Check, in order:"
+            echo "Legion answered **HTTP ${LEGION_STATUS:-?}** to the deploy, with:"
+            echo ""
+            echo "\`\`\`"
+            echo "${LEGION_BODY:-(no body captured)}"
+            echo "\`\`\`"
+            echo ""
+            echo "1. A **2xx** here means Legion ACCEPTED the deploy and then did not start the pod - the image"
+            echo "   tag above exists, so this is Bloxity's side: check the channel on the dashboard."
+            echo "2. The channel's logs on the Bloxity dashboard: a container that exits on boot looks like this."
+            echo "3. Whether the image tag it was asked for exists in the registry (the push step above names it)."
           } >> "$GITHUB_STEP_SUMMARY"
+          # On PROD this is an OUTAGE, and a silent one is how it went unnoticed
+          # before: players get "not connected" while the run sits green. On DEV
+          # it is only a warning, so a half-finished experiment does not block.
+          # (A deployed backend answers /health even with nobody on it - an idle
+          # pod is not the reason this probe fails.)
+          if [ "$CHANNEL" = "prod" ]; then
+            echo "::error::${HOST} never answered /health: PROD players cannot connect. See the job summary."
+            exit 1
+          fi
+          echo "::warning::${HOST} never answered /health. The pod is not running - see the job summary."
 
 
   # ------------------------------------------------------------------ client
@@ -322,8 +316,8 @@ jobs:
           # because the page is served over https and a browser will not open
           # an insecure socket from a secure page. These are the documented
           # Bloxity backend hostnames for this game id:
-          #   dev  -> wss://katana-evolution.dev.host.bloxity.io
-          #   prod -> wss://katana-evolution.host.bloxity.io
+          #   dev  -> wss://katana-evolve.dev.host.bloxity.io
+          #   prod -> wss://katana-evolve.host.bloxity.io
           VITE_SERVER_URL: ${{ needs.channel.outputs.name == 'prod' && format('wss://{0}.host.bloxity.io', env.BLOXITY_GAME_ID) || format('wss://{0}.dev.host.bloxity.io', env.BLOXITY_GAME_ID) }}
         run: |
           set -euo pipefail
